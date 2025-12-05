@@ -17,8 +17,9 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Bitcoin Core binaries
+# Copy Bitcoin Core binaries and libexec
 COPY --from=bitcoin /opt/bitcoin-30.0/bin/ /usr/local/bin/
+COPY --from=bitcoin /opt/bitcoin-30.0/libexec/ /usr/local/libexec/
 
 # Copy Pool binary
 COPY --from=pool-binary /app/pool_sv2 /usr/local/bin/
