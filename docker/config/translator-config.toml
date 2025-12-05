@@ -1,0 +1,39 @@
+# Translation Proxy Configuration
+# Connects SV1 miners (CGMiner, BFGMiner, BitAxe) to SV2 Pool
+
+# Downstream (SV1 miners connect here)
+downstream_address = "0.0.0.0"
+downstream_port = 34255
+
+# Version support
+max_supported_version = 2
+min_supported_version = 2
+
+# Extranonce2 size (max 8 for CGMiner)
+downstream_extranonce2_size = 4
+
+# User identity for pool connection
+user_identity = "bitaxe_miner"
+
+# Aggregate channels (false = each miner gets own channel)
+aggregate_channels = false
+
+# Protocol extensions (empty arrays = no extensions)
+supported_extensions = []
+required_extensions = []
+
+# Difficulty configuration
+[downstream_difficulty_config]
+# Minimum hashrate in H/s (BitAxe ~500 GH/s = 500_000_000_000.0)
+min_individual_miner_hashrate = 500000000000.0
+# Target shares per minute
+shares_per_minute = 1.0
+# Enable variable difficulty
+enable_vardiff = true
+
+# Upstream connection (SV2 Pool)
+[[upstreams]]
+address = "172.30.0.13"
+port = 34254
+# Authority public key from pool
+authority_pubkey = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"

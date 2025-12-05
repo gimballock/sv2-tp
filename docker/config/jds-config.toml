@@ -1,0 +1,26 @@
+# Job Declarator Server Configuration
+
+# Require full template mode
+full_template_mode_required = true
+
+# Authority keys
+authority_public_key = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+authority_secret_key = "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
+cert_validity_sec = 3600
+
+# Coinbase reward (fallback)
+coinbase_reward_script = "wpkh([00000000/0'/0'/0']0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798)"
+
+# JDS listening address
+listen_jd_address = "0.0.0.0:34264"
+
+# Bitcoin Core RPC for mempool (connects to pool-side node)
+core_rpc_url = "http://172.30.0.13"
+core_rpc_port = 48332
+core_rpc_user = "user"
+core_rpc_pass = "password"
+
+# Mempool update interval
+[mempool_update_interval]
+unit = "secs"
+value = 1

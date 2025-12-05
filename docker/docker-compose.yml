@@ -1,0 +1,108 @@
+# Complete SV2 Solo Mining Stack with Custom Templates
+# Architecture:
+#   Bitcoin Core + sv2-tp (Template Provider)
+#     ↓
+#   Job Declarator Client (declares custom jobs)
+#     ↓
+#   Job Declarator Server (validates jobs)
+#     ↓
+#   SV2 Pool (distributes work)
+#     ↓
+#   Translation Proxy (SV1 ↔ SV2)
+#     ↓
+#   Your BitAxe / SV1 Miners
+
+services:
+  # MINER-SIDE: Bitcoin Core + Template Provider (sv2-tp)
+  sv2-node-miner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: sv2-node-miner
+    ports:
+      - "48332:48332"  # testnet4 RPC
+      - "48333:48333"  # testnet4 P2P
+      - "8442:8442"    # sv2-tp Template Provider
+    volumes:
+      - bitcoin-data-miner:/root/.bitcoin
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.10
+    restart: unless-stopped
+
+  # Job Declarator Client - connects to sv2-tp and declares custom jobs
+  jd-client:
+    image: stratumv2/jd_client_sv2:v0.1.0
+    container_name: jd-client
+    command: ["/app/jd_client_sv2", "-c", "/app/jdc-config.toml"]
+    volumes:
+      - ./config/jdc-config.toml:/app/jdc-config.toml:ro
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.12
+    depends_on:
+      - sv2-node-miner
+      - jd-server
+    restart: unless-stopped
+
+  # POOL-SIDE: Bitcoin Core + Pool (combined container)
+  sv2-node-pool:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.pool
+    container_name: sv2-node-pool
+    ports:
+      - "48432:48332"  # Bitcoin Core RPC (different host port to avoid conflict)
+      - "48433:48333"  # Bitcoin Core P2P
+      - "34254:34254"  # Pool SV2 port
+    volumes:
+      - ./config/pool-config.toml:/app/pool-config.toml:ro
+      - bitcoin-data-pool:/root/.bitcoin
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.13
+    restart: unless-stopped
+
+  # Job Declarator Server - validates custom jobs
+  jd-server:
+    image: stratumv2/jd_server:v0.1.0
+    container_name: jd-server
+    command: ["/app/jd_server", "-c", "/app/jds-config.toml"]
+    ports:
+      - "34264:34264"  # JDS port
+    volumes:
+      - ./config/jds-config.toml:/app/jds-config.toml:ro
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.11
+    depends_on:
+      - sv2-node-pool
+    restart: unless-stopped
+
+
+  # Translation Proxy - allows SV1 miners (BitAxe) to connect to SV2 pool
+  translator-proxy:
+    image: stratumv2/translator_sv2:v0.1.0
+    container_name: translator-proxy
+    command: ["/app/translator_sv2", "-c", "/app/proxy-config.toml"]
+    ports:
+      - "34255:34255"  # SV1 miners connect here (stratum+tcp://localhost:34255)
+    volumes:
+      - ./config/translator-config.toml:/app/proxy-config.toml:ro
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.14
+    depends_on:
+      - sv2-node-pool
+    restart: unless-stopped
+
+volumes:
+  bitcoin-data-miner:
+  bitcoin-data-pool:
+
+networks:
+  sv2_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

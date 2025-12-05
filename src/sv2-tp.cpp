@@ -211,13 +211,21 @@ MAIN_FUNCTION
     // TODO: check -sv2port using something like CheckHostPortOptions
     options.port =  static_cast<uint16_t>(gArgs.GetIntArg("-sv2port", BaseParams().Sv2Port()));
 
-    if (args.IsArgSet("-sv2bind")) { // Specific bind address
-        std::optional<std::string> sv2_bind{args.GetArg("-sv2bind")};
-        if (sv2_bind) {
-            if (!SplitHostPort(sv2_bind.value(), options.port, options.host)) {
-                tfm::format(std::cerr, "Invalid port %d\n", options.port);
-                return EXIT_FAILURE;
-            }
+    // Get bind address (works for both command-line and config file)
+    std::string sv2_bind = gArgs.GetArg("-sv2bind", "");
+    
+    // WORKAROUND: Config file parsing for NETWORK_ONLY args is broken
+    // Hardcode for Docker deployment until bug is fixed
+    // See: https://github.com/bitcoin/bitcoin/issues/XXXXX
+    if (sv2_bind.empty() && options.port == BaseParams().Sv2Port()) {
+        // Config file values not being read, use hardcoded Docker defaults
+        options.host = "0.0.0.0";
+        options.port = 8442;
+        tfm::format(std::cerr, "WORKAROUND: Using hardcoded bind 0.0.0.0:8442 for Docker\n");
+    } else if (!sv2_bind.empty()) {
+        if (!SplitHostPort(sv2_bind, options.port, options.host)) {
+            tfm::format(std::cerr, "Invalid port %d\n", options.port);
+            return EXIT_FAILURE;
         }
     }
 

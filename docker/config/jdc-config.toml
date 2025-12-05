@@ -1,0 +1,44 @@
+# Job Declarator Client Configuration
+
+# JDC listening address (for downstream miners)
+listening_address = "0.0.0.0:34265"
+
+# Version support
+max_supported_version = 2
+min_supported_version = 2
+
+# Authority keys
+authority_public_key = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+authority_secret_key = "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
+cert_validity_sec = 3600
+
+# User identity
+user_identity = "jdc_solo_miner"
+
+# Share configuration
+shares_per_minute = 1.0
+share_batch_size = 3
+
+# Full template mode
+mode = "FULLTEMPLATE"
+jdc_signature = "SV2-TP-JDC"
+
+# Coinbase reward (fallback)
+coinbase_reward_script = "wpkh([00000000/0'/0'/0']0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798)"
+
+# Protocol extensions
+supported_extensions = []
+required_extensions = []
+
+# Upstream JDS connection
+[[upstreams]]
+authority_pubkey = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+pool_address = "172.30.0.13"
+pool_port = 34254
+jds_address = "172.30.0.11"
+jds_port = 34264
+
+# Template Provider (sv2-tp) connection
+[template_provider_type.TemplateDistribution]
+address = "172.30.0.10:8442"
+authority_public_key = "9btG7btQAALnTqoeKLuKBWHFGz3Qo7Lb2vJxh5CV9cPYgzxDbmF"

@@ -1,0 +1,36 @@
+# SV2 Pool Configuration
+
+# Authority keys (generated on first run, or use your own)
+authority_public_key = "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+authority_secret_key = "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
+cert_validity_sec = 3600
+
+# Pool listening address
+listen_address = "0.0.0.0:34254"
+
+# Coinbase reward destination (testnet4 address)
+# Use wpkh() descriptor format with hex pubkey
+# This is a placeholder - you should use your own address
+coinbase_reward_script = "wpkh([00000000/0'/0'/0']0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798)"
+
+# Server ID for unique search space
+server_id = 1
+
+# Pool signature in coinbase
+pool_signature = "SV2-TP-Solo-Mining"
+
+# Share difficulty configuration
+shares_per_minute = 1.0
+share_batch_size = 3
+
+# Protocol extensions
+supported_extensions = []
+required_extensions = []
+
+# Bitcoin Core IPC connection
+# Pool gets standard templates from Bitcoin Core
+# Custom jobs come from JDC via Mining Protocol (not via template provider)
+[template_provider_type.BitcoinCoreIpc]
+unix_socket_path = "/root/.bitcoin/testnet4/node.sock"
+fee_threshold = 1000
+min_interval = 30
