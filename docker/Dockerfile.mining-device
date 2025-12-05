@@ -1,0 +1,31 @@
+# Mining Device Simulator
+# Simulates an SV2 mining device for testing
+
+FROM rust:1.75 as builder
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone sv2-apps
+WORKDIR /build
+RUN git clone https://github.com/stratum-mining/sv2-apps.git
+
+# Build mining-device
+WORKDIR /build/sv2-apps/miner-apps/mining-device
+RUN cargo build --release
+
+# Final stage
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binary (built in parent miner-apps/target directory)
+COPY --from=builder /build/sv2-apps/miner-apps/mining-device/target/release/mining_device /app/mining_device
+
+WORKDIR /app
+
+CMD ["/app/mining_device", "--address-pool", "127.0.0.1:34254"]

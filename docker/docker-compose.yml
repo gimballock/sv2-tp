@@ -93,6 +93,28 @@ services:
       - pool
     restart: unless-stopped
 
+  # CPU Miner (optional) - for testing without hardware
+  # Uncomment to enable CPU mining directly to Pool
+  cpu-miner:
+    build:
+      context: .
+      dockerfile: Dockerfile.mining-device
+    container_name: cpu-miner
+    command: [
+      "/app/mining_device",
+      "--address-pool", "172.30.0.13:34254",
+      "--pubkey-pool", "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72",
+      "--id-device", "docker-cpu-miner",
+      "--handicap", "5000",  # 5ms delay to avoid overheating
+      "--cores", "1"         # Use only 1 core
+    ]
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.15
+    depends_on:
+      - pool
+    restart: unless-stopped
+
 volumes:
   bitcoin-data:
 

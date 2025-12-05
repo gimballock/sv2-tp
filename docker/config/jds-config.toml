@@ -14,10 +14,12 @@ coinbase_reward_script = "wpkh([00000000/0'/0'/0']0279be667ef9dcbbac55a06295ce87
 # JDS listening address
 listen_jd_address = "0.0.0.0:34264"
 
-# Bitcoin Core RPC for mempool (connects to miner-side node)
-core_rpc_url = "http://172.30.0.10"
+# Bitcoin Core RPC for mempool validation
+# Using hosted testnet4 node from Stratum Reference Implementation (SRI)
+# This separates template generation (local sv2-tp) from validation (remote node)
+core_rpc_url = "http://75.119.150.111"
 core_rpc_port = 48332
-core_rpc_user = "user"
+core_rpc_user = "username"
 core_rpc_pass = "password"
 
 # Mempool update interval
