@@ -2,15 +2,16 @@
 
 Complete Stratum V2 mining stack with custom template support for solo mining with SV1 hardware (BitAxe).
 
+**Single Bitcoin Core instance** - uses hosted TP for fallback templates.
+
 ## Quick Start
 
 ```bash
 cd docker
 docker-compose up -d
 
-# Wait for both Bitcoin Core nodes to sync (this takes time)
-docker-compose logs -f sv2-node-miner
-docker-compose logs -f sv2-node-pool
+# Wait for Bitcoin Core to sync
+docker-compose logs -f sv2-node
 
 # Once synced, connect your BitAxe to: stratum+tcp://localhost:34255
 ```
@@ -18,39 +19,48 @@ docker-compose logs -f sv2-node-pool
 ## Architecture
 
 ```
-[MINER-SIDE]
-sv2-node-miner (Bitcoin Core + sv2-tp)
-    ↓ Template Distribution Protocol
-JDC (Job Declarator Client)
-    ↓ Job Declaration Protocol
-    
-[POOL-SIDE]  
-JDS (Job Declarator Server) ←─ RPC ─→ sv2-node-pool (Bitcoin Core + Pool)
-    ↓ Mining Protocol                        ↓ IPC
-Pool ←──────────────────────────────────────┘
-    ↓ SV2 Protocol
-Translator Proxy
-    ↓ SV1 Protocol
-BitAxe / SV1 Miners
+[YOUR SETUP - Single Bitcoin Core]
+Bitcoin Core + sv2-tp (your custom template provider)
+    ↓ IPC                    ↓ RPC (mempool)
+    ↓                        ↓
+JDC ←─ (custom templates)  JDS (validates)
+    ↓                        ↓
+    └─→ Pool ←───────────────┘
+         ↑
+         └─ Hosted TP (fallback: vanilla blocks)
+         ↓
+    Translator
+         ↓
+      BitAxe
 ```
 
-### Why Two Bitcoin Core Instances?
+### How It Works
 
-**IPC socket limitation**: Only one process can connect to Bitcoin Core's IPC socket at a time.
+1. **Your sv2-tp** creates custom templates with your transaction selection
+2. **JDC** receives templates and declares them as custom jobs
+3. **JDS** validates custom jobs against Bitcoin Core mempool (RPC)
+4. **JDC** sends validated custom jobs to **Pool** via Mining Protocol
+5. **Pool** uses **hosted TP** (community.stratum.org) for fallback templates
+6. **Miners work on your custom templates** when available, vanilla blocks as fallback
+7. **Translator** bridges SV1 miners to Pool
+8. **BitAxe** mines the work
 
-- **Miner-side**: sv2-tp needs IPC for custom templates
-- **Pool-side**: Pool needs IPC for block submission and validation
+### Why Single Node?
 
-Since they can't share the socket, we run two separate Bitcoin Core instances.
+- **sv2-tp** uses IPC (exclusive access to Bitcoin Core socket)
+- **Pool** uses hosted TP via TCP (no local Bitcoin Core needed!)
+- **JDS** uses RPC (shared access, no conflict)
+
+**Result**: Only ONE Bitcoin Core instance needed (~25GB instead of 50GB)
 
 ## Components
 
 | Service | Container | IP | Purpose |
 |---------|-----------|----|---------| 
-| **sv2-node-miner** | Bitcoin Core + sv2-tp | 172.30.0.10 | Custom template generation |
+| **sv2-node** | Bitcoin Core + sv2-tp | 172.30.0.10 | Your custom template generation |
 | **jd-client** | JDC | 172.30.0.12 | Declares custom jobs |
-| **sv2-node-pool** | Bitcoin Core + Pool | 172.30.0.13 | Mining coordination |
 | **jd-server** | JDS | 172.30.0.11 | Validates custom jobs |
+| **pool** | Pool | 172.30.0.13 | Mining coordination |
 | **translator-proxy** | Translator | 172.30.0.14 | SV1 ↔ SV2 bridge |
 
 ### Ports
@@ -59,52 +69,44 @@ Since they can't share the socket, we run two separate Bitcoin Core instances.
 - `34254` - Pool (SV2)
 - `34255` - Translator (SV1 miners connect here)
 - `34264` - Job Declarator Server
-- `48332/48432` - Bitcoin Core RPC
-- `48333/48433` - Bitcoin Core P2P
-
-## How Custom Templates Work
-
-1. **sv2-tp** creates custom templates from miner-side Bitcoin Core
-2. **JDC** receives templates and declares them as custom jobs
-3. **JDS** validates custom jobs against pool-side Bitcoin Core mempool
-4. **JDC** sends validated jobs to **Pool** via Mining Protocol
-5. **Pool** distributes work (mix of standard + custom jobs)
-6. **Translator** bridges SV1 miners to Pool
-7. **BitAxe** mines the work
-
-### Important: Pool Template Provider
-
-The Pool's `template_provider_type` config is **ONLY for standard fallback templates**:
-
-```toml
-# pool-config.toml
-[template_provider_type.BitcoinCoreIpc]
-unix_socket_path = "/root/.bitcoin/testnet4/node.sock"
-```
-
-- ✅ Pool gets standard templates: Bitcoin Core IPC
-- ✅ Pool gets custom jobs: JDC via Mining Protocol  
-- ❌ `JobDeclarator` template provider type doesn't exist in v0.1.0
-
-Custom jobs are NOT configured via `template_provider_type` - they come through the Mining Protocol from JDC.
+- `48332` - Bitcoin Core RPC
+- `48333` - Bitcoin Core P2P
 
 ## Configuration
 
 All config files are in `docker/config/`:
 
 - **jdc-config.toml** - Connects to sv2-tp (172.30.0.10:8442) and JDS
-- **jds-config.toml** - Uses RPC to pool-side Bitcoin Core (172.30.0.13:48332)
-- **pool-config.toml** - Uses IPC to local Bitcoin Core socket
+- **jds-config.toml** - Uses RPC to Bitcoin Core (172.30.0.10:48332)
+- **pool-config.toml** - Uses hosted TP (community.stratum.org:8442) for fallback
 - **translator-config.toml** - Connects to Pool (172.30.0.13:34254)
 
 ### Key Settings
+
+**Pool uses hosted TP for fallback**:
+```toml
+# pool-config.toml
+[template_provider_type.Sv2Tp]
+address = "community.stratum.org"
+port = 8442
+public_key = "EguTM8URcZDQVeEBsM4B5vg9weqEUnufA8pm85fG4bZd"
+```
+
+**Custom templates come from JDC**, not from the template provider!
 
 **Coinbase Rewards**: Update the `coinbase_reward_script` in pool/jdc/jds configs with your own address:
 ```toml
 coinbase_reward_script = "wpkh([00000000/0'/0'/0']YOUR_PUBKEY_HERE)"
 ```
 
-**Authority Keys**: The configs use example keys. For production, generate your own.
+## Modifying Transaction Selection
+
+Your custom transaction selection logic goes in **sv2-tp**. The Pool's hosted TP is only for fallback - your custom templates take priority via JDC custom jobs.
+
+To modify sv2-tp:
+1. Edit `/Users/ericprice/repos/sv2-tp/src/` (your transaction selection logic)
+2. Rebuild: `docker-compose build sv2-node`
+3. Restart: `docker-compose up -d sv2-node`
 
 ## Troubleshooting
 
@@ -112,22 +114,30 @@ coinbase_reward_script = "wpkh([00000000/0'/0'/0']YOUR_PUBKEY_HERE)"
 
 **Bitcoin Core not synced yet**. Check IBD status:
 ```bash
-docker-compose logs sv2-node-pool | grep -i "ibd\|sync"
+docker-compose logs sv2-node | grep -i "ibd\|sync"
 ```
 
-Pool and JDS will retry until Bitcoin Core is ready.
+JDS and Pool will retry until Bitcoin Core is ready.
 
-### "JobDeclarator variant does not exist"
+### Pool connection to hosted TP fails
 
-This error means you're trying to use `JobDeclarator` as a template provider type in pool-config.toml. This variant doesn't exist - use `BitcoinCoreIpc` instead.
-
-### Translator connection refused
-
-Pool isn't running yet. Wait for pool-side Bitcoin Core to complete IBD.
+Check internet connectivity and that `community.stratum.org:8442` is reachable:
+```bash
+docker exec sv2-pool nc -zv community.stratum.org 8442
+```
 
 ### JDS RPC connection errors
 
-Pool-side Bitcoin Core RPC not ready. JDS will retry automatically.
+Bitcoin Core RPC not ready. JDS will retry automatically.
+
+### Custom jobs not being used
+
+Check JDC logs:
+```bash
+docker-compose logs jd-client | grep -i "custom\|declare"
+```
+
+Ensure sv2-tp is running and providing templates.
 
 ## Development
 
@@ -144,7 +154,7 @@ docker-compose up -d
 docker-compose logs -f
 
 # Specific service  
-docker-compose logs -f sv2-node-pool
+docker-compose logs -f pool
 
 # Errors only
 docker-compose logs | grep -iE "error|panic|fatal"
@@ -159,28 +169,25 @@ docker-compose up -d
 ### Check Service Status
 ```bash
 docker-compose ps
-docker exec sv2-node-pool ps aux
 ```
 
 ## Converting to Your Fork
 
-This is a clone of `fossatmara/sv2-tp`. To convert to your fork:
+This is a fork of `fossatmara/sv2-tp`. To push changes:
 
 ```bash
-# 1. Fork fossatmara/sv2-tp on GitHub
+# Already configured as your fork
+git remote -v  # Should show gimballock/sv2-tp
 
-# 2. Update remote
-git remote set-url origin https://github.com/YOUR_USERNAME/sv2-tp.git
-
-# 3. Commit your changes
+# Commit your changes
 git add .
-git commit -m "Add full SV2 stack Docker orchestration
+git commit -m "Your commit message
 
 Assisted-by: GitHub Copilot
 Assisted-by: OpenAI GPT-4"
 
-# 4. Push
-git push -u origin master
+# Push
+git push origin master
 ```
 
 ## Files
@@ -188,21 +195,30 @@ git push -u origin master
 ```
 docker/
 ├── README.md                    # This file
-├── docker-compose.yml           # Full stack orchestration
-├── Dockerfile                   # Miner-side: Bitcoin Core + sv2-tp
-├── Dockerfile.pool              # Pool-side: Bitcoin Core + Pool
+├── docker-compose.yml           # Single-node orchestration
+├── Dockerfile                   # Bitcoin Core + sv2-tp
 └── config/
-    ├── jdc-config.toml
-    ├── jds-config.toml
-    ├── pool-config.toml
-    └── translator-config.toml
+    ├── jdc-config.toml          # Job Declarator Client config
+    ├── jds-config.toml          # Job Declarator Server config
+    ├── pool-config.toml         # Pool config (uses hosted TP)
+    └── translator-config.toml   # SV1↔SV2 translator config
 ```
 
 ## Requirements
 
 - Docker & Docker Compose
-- ~50GB disk space (two Bitcoin Core testnet4 nodes)
+- ~25GB disk space (single Bitcoin Core testnet4 node)
+- Internet connection (for hosted TP fallback)
 - Patience (IBD takes hours)
+
+## Benefits vs Two-Node Setup
+
+✅ **50% less disk space** (25GB vs 50GB)  
+✅ **Faster sync** (one IBD instead of two)  
+✅ **Simpler architecture** (one node to manage)  
+✅ **Your custom templates** via JDC  
+✅ **Vanilla fallback** from community TP  
+✅ **No second node maintenance**
 
 ## References
 
@@ -210,6 +226,7 @@ docker/
 - [SV2 Apps](https://github.com/stratum-mining/sv2-apps)  
 - [Job Declaration Protocol](https://github.com/stratum-mining/sv2-spec/blob/main/06-Job-Declaration-Protocol.md)
 - [Bitcoin Core 30.0](https://bitcoincore.org/en/releases/30.0/)
+- [Community Hosted TP](https://github.com/stratum-mining/sv2-apps#hosted-template-provider)
 
 ## License
 

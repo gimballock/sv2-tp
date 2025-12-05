@@ -27,10 +27,8 @@ share_batch_size = 3
 supported_extensions = []
 required_extensions = []
 
-# Bitcoin Core IPC connection
-# Pool gets standard templates from Bitcoin Core
-# Custom jobs come from JDC via Mining Protocol (not via template provider)
-[template_provider_type.BitcoinCoreIpc]
-unix_socket_path = "/root/.bitcoin/testnet4/node.sock"
-fee_threshold = 1000
-min_interval = 30
+# Hosted TP for fallback templates (vanilla Bitcoin Core blocks)
+# Custom jobs with your modified transaction selection come from JDC via Mining Protocol
+[template_provider_type.Sv2Tp]
+address = "75.119.150.111:8442"
+public_key = "9bwHCYnjhbHm4AS3pWg9MtAH83mzWohoJJJDELYBqZhDNqszDLc"

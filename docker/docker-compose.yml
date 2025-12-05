@@ -1,30 +1,29 @@
 # Complete SV2 Solo Mining Stack with Custom Templates
-# Architecture:
-#   Bitcoin Core + sv2-tp (Template Provider)
-#     ↓
-#   Job Declarator Client (declares custom jobs)
-#     ↓
-#   Job Declarator Server (validates jobs)
-#     ↓
-#   SV2 Pool (distributes work)
+# Simplified Architecture (Single Bitcoin Core):
+#   Bitcoin Core + sv2-tp (your custom template provider)
+#     ↓ (custom templates)        ↓ (RPC for mempool)
+#   Job Declarator Client         Job Declarator Server
+#     ↓ (declares custom jobs)    ↓ (validates)
+#   SV2 Pool ←─────────────────────┘
+#     ↑ (fallback: hosted TP provides vanilla blocks)
 #     ↓
 #   Translation Proxy (SV1 ↔ SV2)
 #     ↓
 #   Your BitAxe / SV1 Miners
 
 services:
-  # MINER-SIDE: Bitcoin Core + Template Provider (sv2-tp)
-  sv2-node-miner:
+  # Bitcoin Core + sv2-tp (your custom template provider)
+  sv2-node:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: sv2-node-miner
+    container_name: sv2-node
     ports:
       - "48332:48332"  # testnet4 RPC
       - "48333:48333"  # testnet4 P2P
       - "8442:8442"    # sv2-tp Template Provider
     volumes:
-      - bitcoin-data-miner:/root/.bitcoin
+      - bitcoin-data:/root/.bitcoin
     networks:
       sv2_network:
         ipv4_address: 172.30.0.10
@@ -41,29 +40,11 @@ services:
       sv2_network:
         ipv4_address: 172.30.0.12
     depends_on:
-      - sv2-node-miner
+      - sv2-node
       - jd-server
     restart: unless-stopped
 
-  # POOL-SIDE: Bitcoin Core + Pool (combined container)
-  sv2-node-pool:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.pool
-    container_name: sv2-node-pool
-    ports:
-      - "48432:48332"  # Bitcoin Core RPC (different host port to avoid conflict)
-      - "48433:48333"  # Bitcoin Core P2P
-      - "34254:34254"  # Pool SV2 port
-    volumes:
-      - ./config/pool-config.toml:/app/pool-config.toml:ro
-      - bitcoin-data-pool:/root/.bitcoin
-    networks:
-      sv2_network:
-        ipv4_address: 172.30.0.13
-    restart: unless-stopped
-
-  # Job Declarator Server - validates custom jobs
+  # Job Declarator Server - validates custom jobs against Bitcoin Core mempool
   jd-server:
     image: stratumv2/jd_server:v0.1.0
     container_name: jd-server
@@ -76,7 +57,23 @@ services:
       sv2_network:
         ipv4_address: 172.30.0.11
     depends_on:
-      - sv2-node-pool
+      - sv2-node
+    restart: unless-stopped
+
+  # SV2 Pool - uses hosted TP for fallback, receives custom jobs from JDC
+  pool:
+    image: stratumv2/pool_sv2:v0.1.0
+    container_name: sv2-pool
+    command: ["/app/pool_sv2", "-c", "/app/pool-config.toml"]
+    ports:
+      - "34254:34254"  # Pool SV2 port
+    volumes:
+      - ./config/pool-config.toml:/app/pool-config.toml:ro
+    networks:
+      sv2_network:
+        ipv4_address: 172.30.0.13
+    depends_on:
+      - jd-server
     restart: unless-stopped
 
 
@@ -93,12 +90,11 @@ services:
       sv2_network:
         ipv4_address: 172.30.0.14
     depends_on:
-      - sv2-node-pool
+      - pool
     restart: unless-stopped
 
 volumes:
-  bitcoin-data-miner:
-  bitcoin-data-pool:
+  bitcoin-data:
 
 networks:
   sv2_network:

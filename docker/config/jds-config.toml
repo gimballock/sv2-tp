@@ -14,8 +14,8 @@ coinbase_reward_script = "wpkh([00000000/0'/0'/0']0279be667ef9dcbbac55a06295ce87
 # JDS listening address
 listen_jd_address = "0.0.0.0:34264"
 
-# Bitcoin Core RPC for mempool (connects to pool-side node)
-core_rpc_url = "http://172.30.0.13"
+# Bitcoin Core RPC for mempool (connects to miner-side node)
+core_rpc_url = "http://172.30.0.10"
 core_rpc_port = 48332
 core_rpc_user = "user"
 core_rpc_pass = "password"
