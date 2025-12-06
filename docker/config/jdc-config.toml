@@ -21,7 +21,7 @@ share_batch_size = 3
 
 # Full template mode
 mode = "FULLTEMPLATE"
-jdc_signature = "SV2-TP-JDC"
+jdc_signature = "CUSTOM"
 
 # Coinbase reward (fallback)
 coinbase_reward_script = "wpkh([00000000/0'/0'/0']0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798)"
