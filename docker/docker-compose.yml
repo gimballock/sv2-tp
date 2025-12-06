@@ -106,7 +106,8 @@ services:
       "--pubkey-pool", "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72",
       "--id-device", "docker-cpu-miner",
       "--handicap", "5000",  # 5ms delay to avoid overheating
-      "--cores", "1"         # Use only 1 core
+      "--cores", "1",        # Use only 1 core
+      "--nominal-hashrate-multiplier", "0.001"  # Advertise 0.1% of real hashrate for easier initial difficulty
     ]
     networks:
       sv2_network:
